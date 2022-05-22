@@ -11,13 +11,14 @@ double **allocate_real_matrix(int tam);
 double **free_real_matrix(double **v, int tam);
 void strassen(double **A, double **B, double **C, int n, int base);
 void naive_multiplication(double **A, double **B, double **C, int n);
-int compare_matrixes(double **M1, double **M2, int n,int precission);
+int compare_double_matrixes(double **M1, double **M2, int n, double precission);
 
 /*
 Classic matrix multiplication
 C = A*B
 */
-void naive_multiplication(double **A, double **B, double **C, int n){
+void naive_multiplication(double **A, double **B, double **C, int n)
+{
     for (int i = 0; i < n; i++)
     {
         for (int j = 0; j < n; j++)
@@ -25,7 +26,7 @@ void naive_multiplication(double **A, double **B, double **C, int n){
             C[i][j] = 0;
             for (int k = 0; k < n; k++)
             {
-                C[i][j] += A[i][k]*B[k][j];
+                C[i][j] += A[i][k] * B[k][j];
             }
         }
     }
@@ -62,27 +63,27 @@ Algorithm:
 void strassen(double **A, double **B, double **C, int n, int base)
 {
 
-  /* 
-  Recursive base case.
-  If matrices are smaller than base we just use
-  the naive algorithm. 
+    /*
+    Recursive base case.
+    If matrices are smaller than base we just use
+    the naive algorithm.
 
-  The best choice for base will depend on the hardware used
+    The best choice for base will depend on the hardware used
 
-  Based on:
-    https://stackoverflow.com/questions/11495723/why-is-strassen-matrix-multiplication-so-much-slower-than-standard-matrix-multip
-  */
+    Based on:
+      https://stackoverflow.com/questions/11495723/why-is-strassen-matrix-multiplication-so-much-slower-than-standard-matrix-multip
+    */
 
     if (n <= base)
     {
-        naive_multiplication(A,B,C,n);
+        naive_multiplication(A, B, C, n);
         return;
     }
     else
     {
         int k = n / 2;   // new matrix size
         double **x, **y; // auxiliary matrixes to store temporary results
-        
+
         /*new matrixes according to the algorithm*/
         double **m1, **m2, **m3, **m4, **m5, **m6, **m7;
         double **a11, **a12, **a21, **a22;
@@ -137,33 +138,33 @@ void strassen(double **A, double **B, double **C, int n, int base)
         /*M1=(A[0][0]+A[1][1])*(B[0][0]+B[1][1])*/
         matrix_sum(a11, a22, x, k);  // a11 + a22
         matrix_sum(b11, b22, y, k);  // b11 + b22
-        strassen(x, y, m1, k,base); // (a11+a22) * (b11+b22)
+        strassen(x, y, m1, k, base); // (a11+a22) * (b11+b22)
 
         /*M2=(A[1][0]+A[1][1])*B[0][0]*/
         matrix_sum(a21, a22, x, k);    // a21 + a22
-        strassen(x, b11, m2, k,base); // (a21+a22) * (b11)
+        strassen(x, b11, m2, k, base); // (a21+a22) * (b11)
 
         /*M3=A[0][0]*(B[0][1]-B[1][1])*/
         matrix_subtract(b12, b22, x, k); // b12 - b22
-        strassen(a11, x, m3, k,base);   // (a11) * (b12 - b22)
+        strassen(a11, x, m3, k, base);   // (a11) * (b12 - b22)
 
         /*M4=A[1][1]*(B[1][0]-B[0][0])*/
         matrix_subtract(b21, b11, x, k); // b21 - b11
-        strassen(a22, x, m4, k,base);   // (a22) * (b21 - b11)
+        strassen(a22, x, m4, k, base);   // (a22) * (b21 - b11)
 
         /*M5=(A[0][0]+A[0][1])*B[1][1]*/
         matrix_sum(a11, a12, x, k);    // a11 + a12
-        strassen(x, b22, m5, k,base); // (a11+a12) * (b22)
+        strassen(x, b22, m5, k, base); // (a11+a12) * (b22)
 
         /*M6=(A[1][0]-A[0][0])*(B[0][0]+B[0][1])*/
         matrix_subtract(a21, a11, x, k); // a21 - a11
         matrix_sum(b11, b12, y, k);      // b11 + b12
-        strassen(x, y, m6, k,base);     // (a21-a11) * (b11+b12)
+        strassen(x, y, m6, k, base);     // (a21-a11) * (b11+b12)
 
         /*M7=(A[0][1]-A[1][1])*(B[1][0]+B[1][1])*/
         matrix_subtract(a12, a22, x, k); // a12 - a22
         matrix_sum(b21, b22, y, k);      // b21 + b22
-        strassen(x, y, m7, k,base);     //  (a12-a22) * (b21+b22)
+        strassen(x, y, m7, k, base);     //  (a12-a22) * (b21+b22)
 
         /*Calculating the 4 parts for the result matrix*/
         matrix_sum(m3, m5, c12, k); // c12 = m3 + m5
@@ -225,11 +226,11 @@ precission defines the number of precission that is acceptable
 
 return 0 if not equal
 */
-int compare_double_matrixes(double **M1, double **M2, int n, int precission)
+int compare_double_matrixes(double **M1, double **M2, int n, double precission)
 {
-    for(int i=0; i<n; i++)
-        for(int j=0; j<n; j++)
-            if(fabs(M1[i][j]-M2[i][j]) >= precission)
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            if (fabs(M1[i][j] - M2[i][j]) >= precission)
                 return 0;
     return 1;
 }
@@ -329,12 +330,12 @@ int main(int argc, char **argv)
     if (argc != 6)
     {
         printf("This program calculates a matrix-matrix multiplication using the Stranssen algorithm and compares the result against a Traditional(naive) implementation\n"
-            "\nUSE: ./stranssen INTERACTIVE ORDER VERBOSE BASE_CASE N_THREADS\n\n"
-            "If interactive is set to 0, then random matrixes will be generated, in other case, it will ask the user for input\n"
-            "ORDER specifies the order of the matrixes to multiply\n"
-            "if VERBOSE is set to 1 then the input matrixes and the result one will be printed\n"
-            "BASE_CASE for the recursion in Strassen\n"
-            "N_THREADS to execute the code\n");
+               "\nUSE: ./stranssen INTERACTIVE ORDER VERBOSE BASE_CASE N_THREADS\n\n"
+               "If INTERACTIVE is set to 0, then random matrixes will be generated, in other case, it will ask the user for input\n"
+               "ORDER specifies the order of the matrixes to multiply, only powers of 2 are accepted\n"
+               "if VERBOSE is set to 1 then the input matrixes and the result one will be printed\n"
+               "BASE_CASE for the recursion in Strassen\n"
+               "N_THREADS to execute the code\n");
         return 0;
     }
 
@@ -347,6 +348,22 @@ int main(int argc, char **argv)
     int i, j, aux;
     double **A, **B, **C1, **C2;
 
+    /*
+    bitwise operation to check if it is a power of 2
+    
+    If the number is a power of two, then only 1 bit will be set in its binary representation.
+    If we subtract 1 from a number which is power of 2, then all the bits after the set-bit will become set and the set bit will be unset
+
+    N    = 4,  000100
+    N-1  = 3,  000011
+    N    = 16, 010000
+    N-1  = 15, 001111
+    */
+    if (( (n & (n - 1)) != 0) || (n == 0))
+    {
+        printf("Please use an order that is a power of 2\n");
+        return -1;
+    }
     /*
     MEMORY ALLOCATION
     */
@@ -374,11 +391,11 @@ int main(int argc, char **argv)
             for (j = 0; j < n; j++)
                 scanf(" %lf", &B[i][j]);
         }
-    } //interactive
+    } // interactive
     /*
     GENERATE RANDOM INPUT
     */
-    else //random input
+    else // random input
     {
         /* Intializes random number generator */
         srand(time(0));
@@ -396,35 +413,34 @@ int main(int argc, char **argv)
     /*
     PRINT INPUT MATRIXES
     */
-    if(v){
-    printf(
-        "\n===============================\n"
-        "This is the first matrix:\n"
-        "===============================\n"
-        );
-    for (i = 0; i < n; i++)
+    if (v)
     {
-        printf("\n\n\n");
-        for (j = 0; j < n; j++)
-            printf("\t%lf", A[i][j]);
-    }
+        printf(
+            "\n===============================\n"
+            "This is the first matrix:\n"
+            "===============================\n");
+        for (i = 0; i < n; i++)
+        {
+            printf("\n\n\n");
+            for (j = 0; j < n; j++)
+                printf("\t%lf", A[i][j]);
+        }
 
-    printf(
-        "\n\n===============================\n\n\n"
-        "This is the second matrix:\n"
-        "===============================\n"
-        );
+        printf(
+            "\n\n===============================\n\n\n"
+            "This is the second matrix:\n"
+            "===============================\n");
 
-    for (i = 0; i < n; i++)
-    {
-        printf("\n\n\n");
-        for (j = 0; j < n; j++)
-            printf("\t%lf", B[i][j]);
-    }
-    printf(
-        "\n\n===============================\n\n\n");
+        for (i = 0; i < n; i++)
+        {
+            printf("\n\n\n");
+            for (j = 0; j < n; j++)
+                printf("\t%lf", B[i][j]);
+        }
+        printf(
+            "\n\n===============================\n\n\n");
 
-    }//Verbose
+    } // Verbose
 
     /*
     ================================================================
@@ -432,21 +448,21 @@ int main(int argc, char **argv)
     AND CHECK THEIR TIMMINGS
     =================================================================
     */
-    double start,end; 
-    start = omp_get_wtime(); 
-    strassen(A, B, C1, n,base);
-    end = omp_get_wtime(); 
+    double start, end;
+    start = omp_get_wtime();
+    strassen(A, B, C1, n, base);
+    end = omp_get_wtime();
     printf("Strassen algorithm took %f seconds\n", end - start);
-    
-    start = omp_get_wtime(); 
-    naive_multiplication(A,B,C2,n);
-    end = omp_get_wtime(); 
+
+    start = omp_get_wtime();
+    naive_multiplication(A, B, C2, n);
+    end = omp_get_wtime();
     printf("Naive algorithm took %f seconds\n", end - start);
 
     /*
     CHECK RESULTS
     */
-    aux = compare_matrixes(C1,C2,n,0.00001);
+    aux = compare_double_matrixes(C1, C2, n, 0.00001);
     if (aux)
         printf("\nStrassen and naive algorithm yield same results! Yay!\n");
     else
@@ -459,21 +475,20 @@ int main(int argc, char **argv)
     /*
     PRINT THE RESULT MATRIX
     */
-    if(v){
-    printf(
-        "\n\n===============================\n\n\n"
-        "This is the final matrix:\n"
-        "===============================\n"
-        );    for (i = 0; i < n; i++)
+    if (v)
     {
-        printf("\n\n\n");
-        for (j = 0; j < n; j++)
-            printf("\t%lf", C1[i][j]);
-    }
-
-    
-    printf("\n");
-    }//print result
+        printf(
+            "\n\n===============================\n\n\n"
+            "This is the final matrix:\n"
+            "===============================\n");
+        for (i = 0; i < n; i++)
+        {
+            printf("\n\n\n");
+            for (j = 0; j < n; j++)
+                printf("\t%lf", C1[i][j]);
+        }
+        printf("\n");
+    } // print result
 
     /*
     TODO:
@@ -489,7 +504,6 @@ int main(int argc, char **argv)
     free_real_matrix(B, n);
     free_real_matrix(C1, n);
     free_real_matrix(C2, n);
-
 
     return 0;
 }
