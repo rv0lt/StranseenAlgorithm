@@ -4,20 +4,19 @@
 #include <math.h>
 #include <omp.h>
 
-// https://en.wikipedia.org/wiki/Strassen_algorithm
-void matrix_sum(double **a, double **b, double **result, int tam);
-void matrix_subtract(double **a, double **b, double **result, int tam);
+void matrix_sum(double **a, double **b, double **result, int tam, int nthreads);
+void matrix_subtract(double **a, double **b, double **result, int tam, int nthreads);
 double **allocate_real_matrix(int tam);
 double **free_real_matrix(double **v, int tam);
-void strassen(double **A, double **B, double **C, int n, int base);
-void naive_multiplication(double **A, double **B, double **C, int n);
-int compare_double_matrixes(double **M1, double **M2, int n, double precission);
+void strassen(double **A, double **B, double **C, int n, int base, int nthreads);
+void naive_multiplication(double **A, double **B, double **C, int n, int nthreads);
+int compare_double_matrixes(double **M1, double **M2, int n, double precission, int nthreads);
 
 /*
 Classic matrix multiplication
 C = A*B
 */
-void naive_multiplication(double **A, double **B, double **C, int n)
+void naive_multiplication(double **A, double **B, double **C, int n, int nthreads)
 {
     for (int i = 0; i < n; i++)
     {
@@ -33,8 +32,6 @@ void naive_multiplication(double **A, double **B, double **C, int n)
 }
 /*------------------------------------------------------------------------------*/
 /*
-https://en.wikipedia.org/wiki/Strassen_algorithm
-
 Algorithm:
    Matrices A and B are split into four smaller
    (N/2)x(N/2) matrices as follows:
@@ -60,7 +57,7 @@ Algorithm:
         -                                            -
 
 */
-void strassen(double **A, double **B, double **C, int n, int base)
+void strassen(double **A, double **B, double **C, int n, int base, int nthreads)
 {
 
     /*
@@ -76,7 +73,7 @@ void strassen(double **A, double **B, double **C, int n, int base)
 
     if (n <= base)
     {
-        naive_multiplication(A, B, C, n);
+        naive_multiplication(A, B, C, n, nthreads);
         return;
     }
     else
@@ -136,47 +133,47 @@ void strassen(double **A, double **B, double **C, int n, int base)
         }
 
         /*M1=(A[0][0]+A[1][1])*(B[0][0]+B[1][1])*/
-        matrix_sum(a11, a22, x, k);  // a11 + a22
-        matrix_sum(b11, b22, y, k);  // b11 + b22
-        strassen(x, y, m1, k, base); // (a11+a22) * (b11+b22)
+        matrix_sum(a11, a22, x, k, nthreads);  // a11 + a22
+        matrix_sum(b11, b22, y, k, nthreads);  // b11 + b22
+        strassen(x, y, m1, k, base, nthreads); // (a11+a22) * (b11+b22)
 
         /*M2=(A[1][0]+A[1][1])*B[0][0]*/
-        matrix_sum(a21, a22, x, k);    // a21 + a22
-        strassen(x, b11, m2, k, base); // (a21+a22) * (b11)
+        matrix_sum(a21, a22, x, k, nthreads);    // a21 + a22
+        strassen(x, b11, m2, k, base, nthreads); // (a21+a22) * (b11)
 
         /*M3=A[0][0]*(B[0][1]-B[1][1])*/
-        matrix_subtract(b12, b22, x, k); // b12 - b22
-        strassen(a11, x, m3, k, base);   // (a11) * (b12 - b22)
+        matrix_subtract(b12, b22, x, k, nthreads); // b12 - b22
+        strassen(a11, x, m3, k, base, nthreads);   // (a11) * (b12 - b22)
 
         /*M4=A[1][1]*(B[1][0]-B[0][0])*/
-        matrix_subtract(b21, b11, x, k); // b21 - b11
-        strassen(a22, x, m4, k, base);   // (a22) * (b21 - b11)
+        matrix_subtract(b21, b11, x, k, nthreads); // b21 - b11
+        strassen(a22, x, m4, k, base, nthreads);   // (a22) * (b21 - b11)
 
         /*M5=(A[0][0]+A[0][1])*B[1][1]*/
-        matrix_sum(a11, a12, x, k);    // a11 + a12
-        strassen(x, b22, m5, k, base); // (a11+a12) * (b22)
+        matrix_sum(a11, a12, x, k, nthreads);    // a11 + a12
+        strassen(x, b22, m5, k, base, nthreads); // (a11+a12) * (b22)
 
         /*M6=(A[1][0]-A[0][0])*(B[0][0]+B[0][1])*/
-        matrix_subtract(a21, a11, x, k); // a21 - a11
-        matrix_sum(b11, b12, y, k);      // b11 + b12
-        strassen(x, y, m6, k, base);     // (a21-a11) * (b11+b12)
+        matrix_subtract(a21, a11, x, k, nthreads); // a21 - a11
+        matrix_sum(b11, b12, y, k, nthreads);      // b11 + b12
+        strassen(x, y, m6, k, base, nthreads);     // (a21-a11) * (b11+b12)
 
         /*M7=(A[0][1]-A[1][1])*(B[1][0]+B[1][1])*/
-        matrix_subtract(a12, a22, x, k); // a12 - a22
-        matrix_sum(b21, b22, y, k);      // b21 + b22
-        strassen(x, y, m7, k, base);     //  (a12-a22) * (b21+b22)
+        matrix_subtract(a12, a22, x, k, nthreads); // a12 - a22
+        matrix_sum(b21, b22, y, k, nthreads);      // b21 + b22
+        strassen(x, y, m7, k, base, nthreads);     //  (a12-a22) * (b21+b22)
 
         /*Calculating the 4 parts for the result matrix*/
-        matrix_sum(m3, m5, c12, k); // c12 = m3 + m5
-        matrix_sum(m2, m4, c21, k); // c21 = m2 + m4
+        matrix_sum(m3, m5, c12, k, nthreads); // c12 = m3 + m5
+        matrix_sum(m2, m4, c21, k, nthreads); // c21 = m2 + m4
 
-        matrix_sum(m1, m4, x, k);       // m1 + m4
-        matrix_sum(x, m7, y, k);        // m1 + m4 + m7
-        matrix_subtract(y, m5, c11, k); // c11 = m1 + m4 - m5 + m7
+        matrix_sum(m1, m4, x, k, nthreads);       // m1 + m4
+        matrix_sum(x, m7, y, k, nthreads);        // m1 + m4 + m7
+        matrix_subtract(y, m5, c11, k, nthreads); // c11 = m1 + m4 - m5 + m7
 
-        matrix_sum(m1, m3, x, k);       // m1 + m3
-        matrix_sum(x, m6, y, k);        // m1 + m3 + m6
-        matrix_subtract(y, m2, c22, k); // c22 = m1 + m3 - m2 + m6
+        matrix_sum(m1, m3, x, k, nthreads);       // m1 + m3
+        matrix_sum(x, m6, y, k, nthreads);        // m1 + m3 + m6
+        matrix_subtract(y, m2, c22, k, nthreads); // c22 = m1 + m3 - m2 + m6
 
         /* Grouping the parts obtained in the result matrix:*/
         for (i = 0; i < k; i++)
@@ -226,7 +223,7 @@ precission defines the number of precission that is acceptable
 
 return 0 if not equal
 */
-int compare_double_matrixes(double **M1, double **M2, int n, double precission)
+int compare_double_matrixes(double **M1, double **M2, int n, double precission, int nthreads)
 {
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
@@ -238,7 +235,7 @@ int compare_double_matrixes(double **M1, double **M2, int n, double precission)
 /*
 C = A+B
 */
-void matrix_sum(double **A, double **B, double **C, int n)
+void matrix_sum(double **A, double **B, double **C, int n, int nthreads)
 {
     int i, j;
     for (i = 0; i < n; i++)
@@ -249,7 +246,7 @@ void matrix_sum(double **A, double **B, double **C, int n)
 /*
 C = A-B
 */
-void matrix_subtract(double **A, double **B, double **C, int n)
+void matrix_subtract(double **A, double **B, double **C, int n, int nthreads)
 {
     int i, j;
     for (i = 0; i < n; i++)
@@ -343,7 +340,7 @@ int main(int argc, char **argv)
     int n = atoi(argv[2]);
     int v = atoi(argv[3]);
     int base = atoi(argv[4]);
-    int n_threads = atoi(argv[5]);
+    int nthreads = atoi(argv[5]);
 
     int i, j, aux;
     double **A, **B, **C1, **C2;
@@ -450,19 +447,19 @@ int main(int argc, char **argv)
     */
     double start, end;
     start = omp_get_wtime();
-    strassen(A, B, C1, n, base);
+    strassen(A, B, C1, n, base, nthreads);
     end = omp_get_wtime();
     printf("Strassen algorithm took %f seconds\n", end - start);
 
     start = omp_get_wtime();
-    naive_multiplication(A, B, C2, n);
+    naive_multiplication(A, B, C2, n, nthreads);
     end = omp_get_wtime();
     printf("Naive algorithm took %f seconds\n", end - start);
 
     /*
     CHECK RESULTS
     */
-    aux = compare_double_matrixes(C1, C2, n, 0.00001);
+    aux = compare_double_matrixes(C1, C2, n, 0.00001, nthreads);
     if (aux)
         printf("\nStrassen and naive algorithm yield same results! Yay!\n");
     else
