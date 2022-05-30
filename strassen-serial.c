@@ -18,12 +18,14 @@ C = A*B
 */
 void naive_multiplication(double **A, double **B, double **C, int n, int nthreads)
 {
-    for (int i = 0; i < n; i++)
+    int i,j;
+    for (i = 0; i < n; i++)
     {
-        for (int j = 0; j < n; j++)
+        for (j = 0; j < n; j++)
         {
             C[i][j] = 0;
-            for (int k = 0; k < n; k++)
+            int k;
+            for (k = 0; k < n; k++)
             {
                 C[i][j] += A[i][k] * B[k][j];
             }
@@ -225,8 +227,9 @@ return 0 if not equal
 */
 int compare_double_matrixes(double **M1, double **M2, int n, double precission, int nthreads)
 {
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
+    int i,j;
+    for (i = 0; i < n; i++)
+        for (j = 0; j < n; j++)
             if (fabs(M1[i][j] - M2[i][j]) >= precission)
                 return 0;
     return 1;
@@ -237,9 +240,9 @@ C = A+B
 */
 void matrix_sum(double **A, double **B, double **C, int n, int nthreads)
 {
-    // #pragma omp parallel for num_threads(2) schedule(dynamic)
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
+    int i,j;
+    for (i = 0; i < n; i++)
+        for (j = 0; j < n; j++)
             C[i][j] = A[i][j] + B[i][j];
 }
 /*------------------------------------------------------------------------------*/
@@ -248,9 +251,9 @@ C = A-B
 */
 void matrix_subtract(double **A, double **B, double **C, int n, int nthreads)
 {
-    //  #pragma omp parallel for num_threads(2) schedule(dynamic)
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
+    int i,j;
+    for (i = 0; i < n; i++)
+        for (j = 0; j < n; j++)
             C[i][j] = A[i][j] - B[i][j];
 }
 /*------------------------------------------------------------------------------*/
@@ -330,15 +333,14 @@ int main(int argc, char **argv)
                "\nUSE: ./stranssen INTERACTIVE ORDER VERBOSE BASE_CASE\n\n"
                "If INTERACTIVE is set to 0, then random matrixes will be generated, in other case, it will ask the user for input\n"
                "ORDER specifies the order of the matrixes to multiply, only powers of 2 are accepted\n"
-               "if VERBOSE is set to 1 then the input matrixes and the result one will be printed\n"
-               "BASE_CASE for the recursion in Strassen\n"
-               );
+               "VERBOSE, Set between 0 and 3 for different levels of verbose output\n"
+               "BASE_CASE for the recursion in Strassen\n");
         return 0;
     }
 
-    int it = atoi(argv[1]);
+    int interactive = atoi(argv[1]);
     int n = atoi(argv[2]);
-    int v = atoi(argv[3]);
+    int verbose = atoi(argv[3]);
     int base = atoi(argv[4]);
     int nthreads = 0; // NOT implemented
 
@@ -361,6 +363,16 @@ int main(int argc, char **argv)
         printf("Please use an order that is a power of 2\n");
         return -1;
     }
+    if (base <= 0 || base > n)
+    {
+        printf("Please specify a valid Base case\n");
+        return -1;
+    }
+    if (verbose < 0 || verbose > 3)
+    {
+        printf("Set a valid verbose level\n");
+        return -1;
+    }
     /*
     MEMORY ALLOCATION
     */
@@ -372,7 +384,7 @@ int main(int argc, char **argv)
     /*
     ASKING FOR THE INPUT MATRIXES
     */
-    if (it)
+    if (interactive)
     {
         printf("\nNow enter the first matrix:\n\n");
         for (i = 0; i < n; i++)
@@ -410,7 +422,7 @@ int main(int argc, char **argv)
     /*
     PRINT INPUT MATRIXES
     */
-    if (v)
+    if (verbose == 3)
     {
         printf(
             "\n===============================\n"
@@ -449,22 +461,35 @@ int main(int argc, char **argv)
     start = omp_get_wtime();
     strassen(A, B, C1, n, base, nthreads);
     end = omp_get_wtime();
-    printf("Strassen algorithm took %f seconds\n", end - start);
+    if (verbose >= 2)
+        printf("Strassen(s): %f\n", end - start);
+    else if (verbose == 1)
+        printf("%f\n",end-start);
 
     start = omp_get_wtime();
     naive_multiplication(A, B, C2, n, nthreads);
     end = omp_get_wtime();
-    printf("Naive algorithm took %f seconds\n", end - start);
-
+    if (verbose >= 2)
+        printf("Naive(s): %f\n", end - start);
+    else if (verbose == 1)
+        printf("%f\n",end-start);
     /*
     CHECK RESULTS
     */
     aux = compare_double_matrixes(C1, C2, n, 0.00001, nthreads);
-    if (aux)
-        printf("\nStrassen and naive algorithm yield same results! Yay!\n");
+    if (!aux)
+    {
+        printf("\nNO OK\n");
+        if (verbose >= 2)
+            printf("Check the strassen implementation!!!\n");
+        return -1;
+    }
     else
-        printf("\nCheck the strassen implementation!!!\n");
-
+    {
+        printf("\nOK\n");
+        if (verbose >= 2)
+            printf("Strassen and naive algorithm yield same results! Yay!\n");
+    }
     /*
     ========================================================================
     */
@@ -472,7 +497,7 @@ int main(int argc, char **argv)
     /*
     PRINT THE RESULT MATRIX
     */
-    if (v)
+    if (verbose == 3)
     {
         printf(
             "\n\n===============================\n\n\n"
