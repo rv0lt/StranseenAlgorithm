@@ -1,7 +1,7 @@
 RM = /bin/rm -f
 CC = gcc
-CFLAGS = -Wall -pg -O3 -fopenmp -ffast-math -funroll-loops
-LDFLAGS= -lm -pg -fopenmp
+CFLAGS = -Wall -O3 -fopenmp -ffast-math -funroll-loops
+LDFLAGS= -lm -fopenmp
 
 OBJS = strassen-serial.o strassen-parallel.o
 EXECUTABLE = strassen-serial strassen-parallel
