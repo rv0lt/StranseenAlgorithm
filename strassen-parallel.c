@@ -18,15 +18,18 @@ C = A*B
 */
 void naive_multiplication(double **A, double **B, double **C, int n, int nthreads)
 {
+    int i, j;
 #pragma omp parallel for collapse(2) num_threads(nthreads)
-    for (int i = 0; i < n; i++)
+    for (i = 0; i < n; i++)
     {
-        for (int j = 0; j < n; j++)
+        for (j = 0; j < n; j++)
         {
             C[i][j] = 0;
-            for (int k = 0; k < n; k++)
+            int k;
+            for (k = 0; k < n; k += 2)
             {
                 C[i][j] += A[i][k] * B[k][j];
+                C[i][j] += A[i][k + 1] * B[k + 1][j];
             }
         }
     }
@@ -102,7 +105,7 @@ void strassen(double **A, double **B, double **C, int n, int base, int nthreads)
         a12 = allocate_real_matrix(k);
         a21 = allocate_real_matrix(k);
         a22 = allocate_real_matrix(k);
-        
+
         b11 = allocate_real_matrix(k);
         b12 = allocate_real_matrix(k);
         b21 = allocate_real_matrix(k);
@@ -124,28 +127,36 @@ void strassen(double **A, double **B, double **C, int n, int base, int nthreads)
         xm7 = allocate_real_matrix(k);
         ym7 = allocate_real_matrix(k);
 
-
-
 #pragma omp parallel num_threads(nthreads)
         {
-                    int i, j;
-                    // dividing the matrices in 4 sub-matrices:
-                    #pragma omp parallel for shared(i,j) schedule(guided)
-                    for (i = 0; i < k; i++)
-                    {
-                        for (j = 0; j < k; j++)
-                        {
-                            a11[i][j] = A[i][j];
-                            a12[i][j] = A[i][j + k];
-                            a21[i][j] = A[i + k][j];
-                            a22[i][j] = A[i + k][j + k];
+            int i, j;
+// dividing the matrices in 4 sub-matrices:
+#pragma omp parallel for schedule(guided)
+            for (i = 0; i < k; i++)
+            {
+                for (j = 0; j < k; j += 2)
+                {
+                    a11[i][j] = A[i][j];
+                    a12[i][j] = A[i][j + k];
+                    a21[i][j] = A[i + k][j];
+                    a22[i][j] = A[i + k][j + k];
 
-                            b11[i][j] = B[i][j];
-                            b12[i][j] = B[i][j + k];
-                            b21[i][j] = B[i + k][j];
-                            b22[i][j] = B[i + k][j + k];
-                        }
-                    }
+                    a11[i][j + 1] = A[i][j + 1];
+                    a12[i][j + 1] = A[i][j + 1 + k];
+                    a21[i][j + 1] = A[i + k][j + 1];
+                    a22[i][j + 1] = A[i + k][j + 1 + k];
+
+                    b11[i][j] = B[i][j];
+                    b12[i][j] = B[i][j + k];
+                    b21[i][j] = B[i + k][j];
+                    b22[i][j] = B[i + k][j + k];
+
+                    b11[i][j + 1] = B[i][j + 1];
+                    b12[i][j + 1] = B[i][j + 1 + k];
+                    b21[i][j + 1] = B[i + k][j + 1];
+                    b22[i][j + 1] = B[i + k][j + 1 + k];
+                }
+            }
 
 /*BARRIER */
 
@@ -154,18 +165,18 @@ void strassen(double **A, double **B, double **C, int n, int base, int nthreads)
             {
 #pragma omp section
                 {
-                    matrix_sum(a11, a22, xm1, k, nthreads);    // a11 + a22
-                    matrix_sum(b11, b22, ym1, k, nthreads);    // b11 + b22
-                }                                              // section
+                    matrix_sum(a11, a22, xm1, k, nthreads); // a11 + a22
+                    matrix_sum(b11, b22, ym1, k, nthreads); // b11 + b22
+                }                                           // section
 #pragma omp section
                 {
-                    matrix_sum(a21, a22, xm2, k, nthreads);    // a21 + a22
+                    matrix_sum(a21, a22, xm2, k, nthreads);      // a21 + a22
                     matrix_subtract(b12, b22, xm3, k, nthreads); // b12 - b22
-                }                                              // section
+                }                                                // section
 #pragma omp section
                 {
                     matrix_subtract(b21, b11, xm4, k, nthreads); // b21 - b11
-                    matrix_sum(a11, a12, xm5, k, nthreads);    // a11 + a12
+                    matrix_sum(a11, a12, xm5, k, nthreads);      // a11 + a12
                 }                                                // section
 #pragma omp section
                 {
@@ -178,40 +189,40 @@ void strassen(double **A, double **B, double **C, int n, int base, int nthreads)
                     matrix_sum(b21, b22, ym7, k, nthreads);      // b21 + b22
                 }                                                // section
             }                                                    // end pragma omp sections
-            /*
-            BARRIER
-            */
+                                                                 /*
+                                                                 BARRIER
+                                                                 */
 #pragma omp sections
-{
+            {
 #pragma omp section
-{
-            strassen(xm1, ym1, m1, k, base, nthreads); // (a11+a22) * (b11+b22)
-            strassen(xm2, b11, m2, k, base, nthreads); // (a21+a22) * (b11)
-}
-#pragma omp section 
-{           
-            strassen(a11, xm3, m3, k, base, nthreads);   // (a11) * (b12 - b22)
-            strassen(a22, xm4, m4, k, base, nthreads);   // (a22) * (b21 - b11)
-}
+                {
+                    strassen(xm1, ym1, m1, k, base, nthreads); // (a11+a22) * (b11+b22)
+                    strassen(xm2, b11, m2, k, base, nthreads); // (a21+a22) * (b11)
+                }
 #pragma omp section
-{      
-            strassen(xm5, b22, m5, k, base, nthreads); // (a11+a12) * (b22)
-            strassen(xm6, ym6, m6, k, base, nthreads);   // (a21-a11) * (b11+b12)
-}
-#pragma omp section  
-{          
-            strassen(xm7, ym7, m7, k, base, nthreads);   //  (a12-a22) * (b21+b22)
-}
+                {
+                    strassen(a11, xm3, m3, k, base, nthreads); // (a11) * (b12 - b22)
+                    strassen(a22, xm4, m4, k, base, nthreads); // (a22) * (b21 - b11)
+                }
+#pragma omp section
+                {
+                    strassen(xm5, b22, m5, k, base, nthreads); // (a11+a12) * (b22)
+                    strassen(xm6, ym6, m6, k, base, nthreads); // (a21-a11) * (b11+b12)
+                }
+#pragma omp section
+                {
+                    strassen(xm7, ym7, m7, k, base, nthreads); //  (a12-a22) * (b21+b22)
+                }
             }
 
 /*Calculating the 4 parts for the result matrix*/
 #pragma omp sections
             {
 #pragma omp section
-{
-                matrix_sum(m3, m5, c12, k, nthreads); // c12 = m3 + m5
-                matrix_sum(m2, m4, c21, k, nthreads); // c21 = m2 + m4
-}
+                {
+                    matrix_sum(m3, m5, c12, k, nthreads); // c12 = m3 + m5
+                    matrix_sum(m2, m4, c21, k, nthreads); // c21 = m2 + m4
+                }
 #pragma omp section
                 {
                     matrix_sum(m1, m4, xm4, k, nthreads);       // m1 + m4
@@ -225,19 +236,25 @@ void strassen(double **A, double **B, double **C, int n, int base, int nthreads)
                     matrix_subtract(ym6, m2, c22, k, nthreads); // c22 = m1 + m3 - m2 + m6
                 }
             } // pragma omp sections
-        }     // pragma omp parallel
-        
-        /* Grouping the parts obtained in the result matrix:*/
-        for (int i = 0; i < k; i++)
-        {
-            for (int j = 0; j < k; j++)
+              /*BARRIER*/
+            /* Grouping the parts obtained in the result matrix:*/
+            #pragma omp parallel for schedule(guided)
+            for (i = 0; i < k; i++)
             {
-                C[i][j] = c11[i][j];
-                C[i][j + k] = c12[i][j];
-                C[i + k][j] = c21[i][j];
-                C[i + k][j + k] = c22[i][j];
+                for (j = 0; j < k; j += 2)
+                {
+                    C[i][j] = c11[i][j];
+                    C[i][j + k] = c12[i][j];
+                    C[i + k][j] = c21[i][j];
+                    C[i + k][j + k] = c22[i][j];
+
+                    C[i][j + 1] = c11[i][j + 1];
+                    C[i][j + 1 + k] = c12[i][j + 1];
+                    C[i + k][j + 1] = c21[i][j + 1];
+                    C[i + k][j + 1 + k] = c22[i][j + 1];
+                }
             }
-        }
+        } // pragma omp parallel
 
         // deallocating memory (free):
         a11 = free_real_matrix(a11, k);
@@ -276,7 +293,7 @@ void strassen(double **A, double **B, double **C, int n, int base, int nthreads)
 
 } // end of Strassen function
 /*------------------------------------------------------------------------------*/
-/*
+/*<
 
 Function to compare two double matrixes
 precission defines the number of precission that is acceptable
@@ -285,8 +302,9 @@ return 0 if not equal
 */
 int compare_double_matrixes(double **M1, double **M2, int n, double precission, int nthreads)
 {
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
+    int i, j;
+    for (i = 0; i < n; i++)
+        for (j = 0; j < n; j++)
             if (fabs(M1[i][j] - M2[i][j]) >= precission)
                 return 0;
     return 1;
@@ -297,10 +315,13 @@ C = A+B
 */
 void matrix_sum(double **A, double **B, double **C, int n, int nthreads)
 {
-    // #pragma omp parallel for num_threads(2) schedule(dynamic)
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
+    int i, j;
+    for (i = 0; i < n; i++)
+        for (j = 0; j < n; j += 2)
+        {
             C[i][j] = A[i][j] + B[i][j];
+            C[i][j + 1] = A[i][j + 1] + B[i][j + 1];
+        }
 }
 /*------------------------------------------------------------------------------*/
 /*
@@ -308,10 +329,13 @@ C = A-B
 */
 void matrix_subtract(double **A, double **B, double **C, int n, int nthreads)
 {
-    //  #pragma omp parallel for num_threads(2) schedule(dynamic)
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
+    int i, j;
+    for (i = 0; i < n; i++)
+        for (j = 0; j < n; j += 2)
+        {
             C[i][j] = A[i][j] - B[i][j];
+            C[i][j + 1] = A[i][j + 1] - B[i][j + 1];
+        }
 }
 /*------------------------------------------------------------------------------*/
 /*
@@ -323,7 +347,6 @@ double **allocate_real_matrix(int tam)
     int i;
     double **v; // pointer to the vector
 
-    // allocates one vector of vectors (matrix)
     v = (double **)malloc(tam * sizeof(double *));
 
     if (v == NULL)
@@ -332,18 +355,16 @@ double **allocate_real_matrix(int tam)
         return (NULL);
     }
 
-    // allocates each row of the matrix
-    for (i = 0; i < tam; i++)
+    v[0] = malloc(tam * tam * sizeof(double));
+    if (v[0] == NULL)
     {
-        v[i] = (double *)malloc(tam * sizeof(double));
-
-        if (v[i] == NULL)
-        {
-            printf("** Error: Insufficient memory **");
-            free_real_matrix(v, tam);
-            return (NULL);
-        }
+        printf("** Error: Insufficient memory **");
+        free_real_matrix(v, tam);
+        return (NULL);
     }
+
+    for (i = 0; i < tam; i++)
+        v[i] = v[0] + i * tam;
 
     return (v); // returns the pointer to the vector.
 }
@@ -354,21 +375,11 @@ free the matrix allocated
 double **free_real_matrix(double **v, int tam)
 {
 
-    int i;
-
     if (v == NULL)
-    {
         return (NULL);
-    }
 
-    for (i = 0; i < tam; i++)
-    {
-        if (v[i])
-        {
-            free(v[i]); // frees a row of the matrix
-            v[i] = NULL;
-        }
-    }
+    free(v[0]);
+    v[0] = NULL;
 
     free(v); // frees the pointer /
     v = NULL;
@@ -391,7 +402,7 @@ int main(int argc, char **argv)
                "\nUSE: ./stranssen INTERACTIVE ORDER VERBOSE BASE_CASE N_THREADS RECURSION_LEVEL\n\n"
                "If INTERACTIVE is set to 0, then random matrixes will be generated, in other case, it will ask the user for input\n"
                "ORDER specifies the order of the matrixes to multiply, only powers of 2 are accepted\n"
-               "if VERBOSE is set to 1 then the input matrixes and the result one will be printed\n"
+               "VERBOSE, Set between 0 and 3 for different levels of verbose output\n"
                "BASE_CASE for the recursion in Strassen\n"
                "N_THREADS to execute the code\n"
                "RECURSION_LEVEL Level of the stranssen algorithm recurrsion from which we stop creating threads\n");
@@ -434,6 +445,11 @@ int main(int argc, char **argv)
     if (recursion <= 0 || recursion >= n)
     {
         printf("Please specify a valid level of recurssion to stop creating threads\n");
+        return -1;
+    }
+    if (verbose < 0 || verbose > 3)
+    {
+        printf("Set a valid verbose level\n");
         return -1;
     }
 
@@ -508,7 +524,7 @@ int main(int argc, char **argv)
     /*
     PRINT INPUT MATRIXES
     */
-    if (verbose)
+    if (verbose == 3)
     {
         printf(
             "\n===============================\n"
@@ -547,22 +563,36 @@ int main(int argc, char **argv)
     start = omp_get_wtime();
     strassen(A, B, C1, n, base, nthreads);
     end = omp_get_wtime();
-    printf("Strassen algorithm took %f seconds\n", end - start);
+    if (verbose >= 2)
+        printf("Strassen(s): %f\n", end - start);
+    else if (verbose == 1)
+        printf("%f\n", end - start);
 
     start = omp_get_wtime();
     naive_multiplication(A, B, C2, n, nthreads);
     end = omp_get_wtime();
-    printf("Naive algorithm took %f seconds\n", end - start);
+    if (verbose >= 2)
+        printf("Naive(s): %f\n", end - start);
+    else if (verbose == 1)
+        printf("%f\n", end - start);
 
     /*
     CHECK RESULTS
     */
     aux = compare_double_matrixes(C1, C2, n, 0.00001, nthreads);
-    if (aux)
-        printf("\nStrassen and naive algorithm yield same results! Yay!\n");
+    if (!aux)
+    {
+        printf("\nNO OK\n");
+        if (verbose >= 2)
+            printf("Check the strassen implementation!!!\n");
+        return -1;
+    }
     else
-        printf("\nCheck the strassen implementation!!!\n");
-
+    {
+        printf("\nOK\n");
+        if (verbose >= 2)
+            printf("Strassen and naive algorithm yield same results! Yay!\n");
+    }
     /*
     ========================================================================
     */
@@ -570,7 +600,7 @@ int main(int argc, char **argv)
     /*
     PRINT THE RESULT MATRIX
     */
-    if (verbose)
+    if (verbose == 3)
     {
         printf(
             "\n\n===============================\n\n\n"
